@@ -1,7 +1,9 @@
 # Jvedio-AI
 一个本地化的（JAV）电影管理/数据库系统
 
-Jvedio AI是基于原Jvedio开源（C#/.NET）项目（https://github.com/hitchao/Jvedio）修改而来且持续维护的新一代JAV/电影管理系统。
+Jvedio AI是基于原Jvedio开源（C#/.NET）项目修改而来且持续维护的新一代JAV/电影管理系统。本项目已获得原项目作者授权，且已经剔除使用GPL 3.0等许可证的第三方库，从而保证其满足MIT许可协议。
+
+原项目地址：https://github.com/hitchao/Jvedio
 
 本软件除大量重构和优化了原版软件的代码及功能外，还额外新增了众多实用功能：
 
