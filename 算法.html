@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Jvedio AI 推荐系统：算法与架构白皮书</title>
+    <style>
+        :root {
+            --primary-color: #0f172a;
+            --secondary-color: #334155;
+            --accent-color: #2563eb;
+            --bg-color: #f8fafc;
+            --code-bg: #f1f5f9;
+            --border-color: #e2e8f0;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            line-height: 1.7;
+            color: var(--secondary-color);
+            background-color: #ffffff;
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 40px 20px;
+        }
+
+        h1,
+        h2,
+        h3,
+        h4 {
+            color: var(--primary-color);
+            margin-top: 2em;
+        }
+
+        h1 {
+            font-size: 2.2rem;
+            border-bottom: 2px solid var(--primary-color);
+            padding-bottom: 10px;
+            margin-bottom: 0.5em;
+        }
+
+        h2 {
+            font-size: 1.75rem;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 8px;
+        }
+
+        h3 {
+            font-size: 1.25rem;
+            color: var(--accent-color);
+        }
+
+        p,
+        li {
+            font-size: 1rem;
+        }
+
+        ul {
+            padding-left: 20px;
+        }
+
+        li {
+            margin-bottom: 8px;
+        }
+
+        strong {
+            color: var(--primary-color);
+        }
+
+        code {
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+            background-color: var(--code-bg);
+            padding: 0.2em 0.4em;
+            border-radius: 3px;
+            font-size: 0.9em;
+            color: #db2777;
+        }
+
+        pre {
+            background-color: var(--code-bg);
+            border: 1px solid var(--border-color);
+            padding: 1rem;
+            border-radius: 6px;
+            overflow-x: auto;
+        }
+
+        pre code {
+            background-color: transparent;
+            color: inherit;
+            padding: 0;
+        }
+
+        .math-block {
+            background-color: var(--bg-color);
+            padding: 15px;
+            border-left: 4px solid var(--accent-color);
+            margin: 20px 0;
+            overflow-x: auto;
+        }
+
+        .mermaid-wrapper {
+            background-color: var(--bg-color);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 20px;
+            margin: 30px 0;
+            display: flex;
+            justify-content: center;
+            overflow-x: auto;
+        }
+
+        .metadata {
+            background-color: var(--code-bg);
+            padding: 15px;
+            border-radius: 6px;
+            margin-bottom: 30px;
+            font-size: 0.9rem;
+            border-left: 4px solid var(--secondary-color);
+        }
+    </style>
+    <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <script>
+        window.MathJax = {
+            tex: { inlineMath: [['$', '$'], ['\\(', '\\)']], displayMath: [['$$', '$$'], ['\\[', '\\]']] }
+        };
+    </script>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10.6.1/dist/mermaid.min.js"></script>
+    <script>
+        mermaid.initialize({ startOnLoad: true, theme: 'default' });
+    </script>
+</head>
+
+<body>
+
+    <h1>Jvedio AI 推荐系统：算法与架构白皮书</h1>
+
+    <div class="metadata">
+        <strong>版本：</strong> 4.0 (BGE-M3 Semantic Search & Metadata Optimized)<br>
+        <strong>定位：</strong> 本地化、离线化工业级影视内容语义搜索引擎与推荐引擎<br>
+        <strong>受众：</strong> 资深后端开发、算法工程师、推荐系统架构师
+    </div>
+
+    <h2>1. 系统架构概述 (System Architecture Overview)</h2>
+    <p>本系统是一个完全离线化的语义搜索与推荐引擎。系统抛弃了传统的纯倒排索引与关键字精准/模糊匹配，采用<strong>多模态特征融合（NLP 语义 + 连续性数值参数）</strong>的高维混合张量表示法。</p>
+    <p>核心推荐管线（Pipeline）包含三大物理层：</p>
+    <ol>
+        <li><strong>特征工程与向量化层 (Embedding Layer)：</strong> 将非结构化文本与结构化数值映射为统一的 1106 维高维连续实数空间，深度适配 BGE-M3 语义模型。</li>
+        <li><strong>画像对冲与生成层 (Profiling Layer)：</strong> 基于历史行为数据，利用对比学习与 TF-IDF 差分思想，分离用户的“隐性底色”与“显性偏好/厌恶”，生成 Master
+            (正向)
+            与 Penalty (负向) 双向量作为用户画像。</li>
+        <li><strong>召回与硬件加速层 (Retrieval & Hardware Acceleration)：</strong> 基于 <code>System.Numerics.Vectors</code> 的
+            AVX2 指令集+全内存SIMD浮点运算加速，融合数据稀疏性惩罚（Sparsity Penalty）与 MMR 重排，实现毫秒级精准响应。</li>
+    </ol>
+
+    <h2>2. 特征工程与向量化 (Feature Engineering & Vectorization)</h2>
+    <p>本模块的目标是将单部影片的所有异构数据合并为一个定长的高维张量（$D = 1106$）。</p>
+
+    <h3>2.1 文本语义轨道 (NLP Track)</h3>
+    <ul>
+        <li><strong>模型选择：</strong> 采用 <code>BAAI/bge-m3</code> 模型，原生支持多种长度文本的高效对称语义编码。</li>
+        <li><strong>对称编码与特征重排 (Symmetric Encoding & Metadata Reordering)：</strong>
+            <ul>
+                <li><strong>零前缀机制：</strong> BGE-M3 模型原生支持对称与非对称检索，不再需要人为的 <code>passage:</code> 和 <code>query:</code>
+                    前缀，直接送入原始文本。</li>
+                <li><strong>拼接顺序优化：</strong>
+                    <code>Plot (剧情) -&gt; Genres (类型) -&gt; Label (标签) -&gt; Actor (演员) -&gt; Series (系列) -&gt; Title (标题)</code>。将语义密度最高的剧情置于最前，标题置于最后，以最大化利用
+                    Transformer 的自注意力机制（Self-Attention）与位置编码，避免信息截断。
+                </li>
+                <li><strong>元数据精确清洗 (Metadata Cleaning)：</strong> 在进入大模型向量化前，引入独立的
+                    <code>blacklist_plot.txt</code>以及<code>blacklist_genre.txt</code> 实现 100%
+                    全字匹配拦截，彻底刮削数据中混入的广告词、水印或固定格式冗余词汇，确保输入给 Embedding 模型的文本语义绝对纯净。
+                </li>
+                <li><strong>静态兜底剧情 (Dummy Plot)：</strong>
+                    若原文本缺失剧情，系统自动使用标签和类型生成静态伪剧情，利用基础语法结构稀释标签浓度，彻底阻断自注意力机制对短文本标题的异常短路匹配，消除“空壳锚点漂移效应”。</li>
+            </ul>
+        </li>
+        <li><strong>算法流程：</strong>
+            <ol>
+                <li><strong>分词 (Tokenization)：</strong> 将文本切分为 Token，最大截断长度提升至 $L = 768$。</li>
+                <li><strong>前向传播 (Forward Pass)：</strong> 提取模型最后一层隐藏状态，或直接读取 Vespa 优化后的二维池化输出，维度为 $[1, 1024]$。</li>
+                <li><strong>池化 (Mean/CLS Pooling)：</strong> 结合 Attention Mask，输出稠密向量，将包含演员NLP信息的向量降维至 $[1024]$。</li>
+                <li><strong>归一化：</strong> 执行严格的全局 $L2$ 归一化 $\frac{v}{\|v\|_2}$。</li>
+            </ol>
+        </li>
+    </ul>
+
+    <h3>2.2 数值连续特征轨道 (Numerical Feature Track)</h3>
+    <p>解决传统 NLP 模型对具体数字不敏感的物理缺陷。该轨道将少量的连续数值型特征，通过核方法升维至 82 维的稠密空间。</p>
+    <ul>
+        <li><strong>输入数据：</strong> 包含 6 项演员原生参数与 3 项派生参数。</li>
+        <li><strong>核心算法：分位数锚点高斯激活 (Quantile-based Gaussian Kernel)</strong>
+            <ul>
+                <li>对每一种数值特征，提取 $K$ 个分位数（如 10%, ..., 90%）作为高斯函数的均值 $\mu_i$（锚点），9个特征的锚点总数相加即为 82 维。</li>
+                <li>自适应计算方差 $\sigma_i$（相邻锚点间距的平均值）。</li>
+                <li>计算观测值 $x$ 在每个锚点上的激活强度：
+                    <div class="math-block">$$A_i = \exp\left(-\frac{(x - \mu_i)^2}{2\sigma_i^2}\right)$$</div>
+                </li>
+            </ul>
+        </li>
+        <li><strong>聚合策略：</strong> 针对多演员情况执行高斯激活均值池化，最终进行局部 $L2$ 归一化。</li>
+    </ul>
+
+    <h3>2.3 混合张量融合与缩放 (Hybrid Fusion & Scaling)</h3>
+    <p>将上述两个轨道的向量拼接到同一向量空间（$1024 + 82 = 1106$ 维）。为防止高维空间塌缩与特征淹没，采用特定权重进行 Scale。</p>
+    <ul>
+        <li><strong>降维合并：</strong> 采用 1106 维替代了旧有的臃肿架构，保证语义富集度的同时，依托
+            <code>Buffer.BlockCopy</code> 序列化压缩 SQLite 磁盘体积。
+        </li>
+    </ul>
+
+    <h2>3. 召回与语义搜索机制 (Semantic Search & Retrieval)</h2>
+
+    <h3>3.1 AVX2/SIMD 硬件加速 (Hardware Acceleration)</h3>
+    <p>为了在本地客户端实现“全内存无倒排穷举比对”，抛弃了低效的标量计算 <code>for</code> 循环，底层直接使用 <code>System.Numerics.Vectors&lt;float&gt;</code>
+        进行汇编级硬件加速。</p>
+    <ul>
+        <li><strong>自适应降级：</strong> JIT 编译器动态评估 CPU 能力，支持 AVX2 的 CPU 单周期可吞吐 8 个 Float 并行乘加（256-bit）；若硬件不支持，可无缝平滑降级至 SSE2
+            甚至标量运算，拒绝异常崩溃。</li>
+    </ul>
+
+    <h3>3.2 元数据稀疏性惩罚 (Metadata Sparsity Penalty)</h3>
+    <p><strong>工程缺陷修复：</strong> 解决 Embedding 模型中“空壳锚点漂移效应”。当某部影片完全缺失 Title、Plot、Genre 等字段时，其生成的向量会退化为空洞特征，与任意输入 Query
+        极易产生畸形的高余弦相似度（假阳性匹配）。</p>
+    <ul>
+        <li>在召回阶段通过 SQL 实时统计元数据长度：<code>LENGTH(Title) + LENGTH(Plot) + LENGTH(Genre)</code></li>
+        <li>若总长度 $\le 5$：进行 <strong>极度降权 (Score $\times 0.1$)</strong>，强制剔除出 Top-N。</li>
+        <li>若总长度 $\le 15$：进行 <strong>温和降权 (Score $\times 0.6$)</strong>。</li>
+    </ul>
+
+    <h3>3.3 独立相似影片查询轨道 (Isolated Similar Movies Track)</h3>
+    <p><strong>业务痛点与取舍：</strong> 传统的基于混合张量（1024 维文本 + 82 维连续特征）的 KNN
+        最近邻搜索，在处理“查找相似影片”任务时存在固有缺陷：由于演员身材特征（数值轨道）的权重干扰，两部剧情/题材完全不相干的影片，可能仅仅因为主演的身材数值高度重合，而产生畸形的高相似度，导致“特征串味”。</p>
+    <ul>
+        <li><strong>动态降维查库策略 (Dynamic Dimensionality Reduction)：</strong> 为解决此问题，系统在执行“查找相似影片”与“语义搜索”时，实施了不对称查询策略。</li>
+        <li><strong>纯文本语义重构：</strong> 系统不使用数据库中该影片现成的 1106 维向量，而是基于该影片的纯文本特征（剥离所有身体数值），实时调用大模型生成一个 1024 维的
+            <strong>纯文本临时查询向量</strong>。
+        </li>
+        <li><strong>自动对齐降维比对：</strong> 凭借点积运算与余弦相似度的维度自适应特性，1024 维的查询向量在与全库 1106 维的向量池比对时，会自动忽略全库向量的后 82
+            维数值分量。这从根本的数学物理层面上，彻底排除了身材数据对“相似度查询”的干扰，让相似影片完全回归其原始的题材与剧情语义关联。</li>
+    </ul>
+
+    <h2>4. 智能推荐引擎与多样性重排 (AI Recommendation & Diversity Engine)</h2>
+    <p>推荐引擎不采用全库暴力穷举，而是通过严密的统计学公式与概率抽样，在保证“极高准确率”的前提下，最大化“盲盒发现感（Serendipity）”。</p>
+
+    <h3>4.1 平方根衰减真随机抽样 (Square Root Decay True Random Sampling)</h3>
+    <p>为了解决当影库规模极大时，固定比例抽样会导致头部神作被过度曝光的“信息茧房”问题，系统引入了随影库规模动态调整的平方根衰减法：</p>
+    <ul>
+        <li><strong>单批次采样公式：</strong>
+            <div class="math-block">$$SampleSize = \min\left(400, \max\left(4 \times BatchSelect, \sqrt{N} \times
+                2.5\right)\right)$$</div>
+            <em>其中 $N$ 为全库已向量化影片总数。</em>
+        </li>
+        <li><strong>物理意义：</strong> 当 $N=300$ 时，单次抽样率为 14.3%；当 $N=16000$ 时，单次抽样率断崖式跌落至 1.9%。这完美剥夺了大库中那几十部 5
+            星神作“靠海量遍历次次被抽中”的特权，让算法每次只能在冰山一角中做局部寻优。</li>
+        <li><strong>UUID 级真随机洗牌：</strong> 弃用标准 <code>Random.Next()</code> 伪随机发生器，采用 <code>Guid.NewGuid()</code> 进行
+            $O(N)$ 复杂度的系统底层真随机打乱，确保每一部影片进入采样池的数学概率绝对均等。</li>
+    </ul>
+
+    <h3>4.2 绝对值加权复核打分 (Additive Weighted Scoring, AWS)</h3>
+    <p>抛弃了粗糙的排序融合（RRF），采用极其严密的浮点数加权体系，彻底消灭“同星级分数平局”现象，建立绝对的阶级护城河：</p>
+    <ul>
+        <li><strong>基础相似度 (Similarity)：</strong> $Sim = \text{CosineSimilarity}(\text{MasterVector},
+            \text{FilmVector})$，并受到负向画像 `PenaltyVector` 的特征惩罚。</li>
+        <li><strong>独立质量分 (Quality Score)：</strong> $Q = (\frac{Grade}{5} \times 0.7 + \frac{Rating}{100} \times 0.3)
+            \times \text{ViewPenalty}$ （基于观看次数的疲劳衰减）。</li>
+        <li><strong>最终复核得分 (PreScore)：</strong>
+            <div class="math-block">$$PreScore = 0.85 \times Sim + 0.15 \times Q$$</div>
+            <em>此公式确立了“语义相似度绝对主导，高星级评分锦上添花”的底层基调。</em>
+        </li>
+    </ul>
+
+    <h3>4.3 动态对数扩池与 MMR 重排 (Logarithmic Expansion & Maximal Marginal Relevance)</h3>
+    <p>为打破那少数几部“T0级神作（极高相似度+5星）”对推荐结果首屏的绝对霸榜，系统重新激活了 MMR 算法，并结合了自适应的对数级蓄水池扩容机制：</p>
+    <ol>
+        <li><strong>对数级平滑扩容 (Logarithmic Pool Expansion)：</strong>
+            在进入最终挑选前，系统不直接抓取 50 部，而是根据库大小计算一个动态乘数：
+            <div class="math-block">$$Multiplier = \max(2.0, \min(5.0, \log_{10}(N)))$$</div>
+            对于 16000 部的大库，乘数为 4.2，系统会先挑选出 $50 \times 4.2 = 210$ 部高质量候选影片。这为底部的打散去重算法提供了极其充足的“弹药库”。
+        </li>
+        <li><strong>演员配额拦截 (Actor Quota)：</strong> 硬性规定单一演员在最终结果中的出场率不得超过 $\max(1, TopN \times 10\%)$，强制截断屠版现象。</li>
+        <li><strong>MMR 多样性惩罚打散：</strong> 算法从 210 部候选大名单中，逐一挑选出 50 部。每挑选一部，都会对其余影片进行惩罚：
+            <div class="math-block">
+                $$MMR\_Score = \lambda \cdot PreScore - (1-\lambda) \cdot \max_{s \in Selected} Cosine(Film, s)$$
+            </div>
+            <em>(当前系统设定 $\lambda =
+                0.7$)。这意味着如果某部神作与已经选出的神作在特征上高度同质化（例如题材完全一致），它将被重重扣分并被无情踢出名单。从根本的几何空间上，确保了展现结果既有极高水准，又绝不雷同。</em>
+        </li>
+    </ol>
+
+    <h2>5. 核心算法流转架构图 (Pipeline Flowchart)</h2>
+
+    <div class="mermaid-wrapper">
+        <div class="mermaid">
+            graph TD
+            classDef dataBox fill:#eef2f5,stroke:#94a3b8,stroke-width:1px,color:#334155;
+            classDef processBox fill:#e0f2fe,stroke:#38bdf8,stroke-width:2px,color:#0f172a;
+            classDef aiBox fill:#fdf4ff,stroke:#d946ef,stroke-width:2px,color:#0f172a;
+            classDef dbBox fill:#f0fdf4,stroke:#4ade80,stroke-width:2px,stroke-dasharray: 5 5,color:#0f172a;
+
+            subgraph Data_Vectorization [一、多模态特征融合向量化]
+            V_In[非结构化数据输入\nDataID/Title/Genre/Actor]:::dataBox
+
+            subgraph NLP_Track [NLP 文本语义轨道]
+            T_Prompt[拼接顺序重排与\n静态兜底剧情生成]:::processBox
+            ONNX[BGE-M3 ONNX Transformer 模型\n1024维稠密张量]:::aiBox
+            MeanPool[CLS/Mean Pooling\n提取核心语义]:::processBox
+            end
+
+            subgraph Num_Track [数值连续轨道]
+            N_Extract[提取原生及派生数值]:::processBox
+            Gauss[分位数锚点高斯激活\nL2 局部归一化]:::aiBox
+            end
+
+            V_In --> T_Prompt
+            V_In --> N_Extract
+            T_Prompt --> ONNX --> MeanPool
+            N_Extract --> Gauss
+
+            Merge[维度拼接与动态缩放\n1024d + 82d = 1106d]:::processBox
+            L2_Global[全局 L2 归一化\nBuffer.BlockCopy 纯净打包]:::processBox
+            DB_Video[(metadata_video.Embedding)]:::dbBox
+
+            MeanPool --> Merge
+            Gauss --> Merge
+            Merge --> L2_Global --> DB_Video
+            end
+
+            subgraph Serving_Layer [二、毫秒级语义检索与召回]
+            Q_In[用户搜索输入 Query]:::dataBox
+            Q_Prompt[自然语言直接送入\n零前缀处理]:::processBox
+            Q_ONNX[BGE-M3 ONNX 实时推理\n生成 1106d 目标查询向量]:::aiBox
+
+            Q_In --> Q_Prompt --> Q_ONNX
+
+            RAM_Load[全量 1106d Embedding 预载入\n绕过磁盘 IO 瓶颈]:::processBox
+            SIMD[System.Numerics.Vectors\nAVX2 / SSE2 硬件加速向量点积]:::aiBox
+            Sparsity[元数据稀疏性惩罚\n拦截低长真空锚点漂移]:::processBox
+
+            DB_Video --> RAM_Load --> SIMD
+            Q_ONNX --> SIMD
+            SIMD --> Sparsity --> RankedList[Top 50 初排列表]:::dataBox
+            end
+
+            subgraph Reranking_Layer [三、多样性过滤与重排]
+            Profile[(UserProfile 偏好画像\nMaster / Penalty 双向量)]:::dbBox
+            Score_Adjust[画像偏好融合计算\n质量分提权 & 负向量截断]:::processBox
+            Quota[10% 演员防屠版拦截配额]:::processBox
+            MMR[MMR 惩罚算法 λ=0.7\n降权同质化结果]:::aiBox
+            Output[最终展示推荐/搜索结果]:::dataBox
+
+            RankedList --> Score_Adjust
+            Profile --> Score_Adjust
+            Score_Adjust --> Quota --> MMR --> Output
+            end
+        </div>
+    </div>
+
+</body>
+
+</html>
