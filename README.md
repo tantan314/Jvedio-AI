@@ -62,7 +62,9 @@ AI分析、推荐、语义检索等功能，建议使用2020年后上市的6核+
 
 经Claude Opus 4.6模型基于代码进行的算法审计，得出以下结论：
 
-<img width="2020" height="900" alt="image" src="https://github.com/user-attachments/assets/b3b7d6ce-eb4b-402e-ba1b-aef28190f3f2" />
+
+<img width="1544" height="1097" alt="image" src="https://github.com/user-attachments/assets/411e2964-4f9d-4f25-8b62-e4190d2c8018" />
+
 
 
 若对本项目AI功能相关的核心算法及原理感兴趣，可阅读仓库中公开的“算法.html”文件。也欢迎有能力的用户为本项目提出各项优化或新功能建议。
