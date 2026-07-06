@@ -177,9 +177,10 @@
         </li>
         <li><strong>算法流程：</strong>
             <ol>
-                <li><strong>分词 (Tokenization)：</strong> 将文本切分为 Token，最大截断长度提升至 $L = 768$。</li>
-                <li><strong>前向传播 (Forward Pass)：</strong> 提取模型最后一层隐藏状态，或直接读取 Vespa 优化后的二维池化输出，维度为 $[1, 1024]$。</li>
-                <li><strong>池化 (Mean/CLS Pooling)：</strong> 结合 Attention Mask，输出稠密向量，将包含演员NLP信息的向量降维至 $[1024]$。</li>
+                <li><strong>分词 (Tokenization)：</strong> 将文本切分为 Token，最大截断长度限制在 $L =
+                    768$而非模型支持的最大8192，以避免冗长输入造成的语义坍缩或稀释，以及最大化利用模型的注意力机制。</li>
+                <li><strong>前向传播 (Forward Pass)：</strong> 提直接读取 Vespa 优化后的二维池化输出，维度为 $[1, 1024]$。</li>
+                <li><strong>池化 (Mean/CLS Pooling)：</strong> 结合 Attention Mask，输出稠密向量，将包含NLP化后的演员数据信息向量降维至 $[1024]$。</li>
                 <li><strong>归一化：</strong> 执行严格的全局 $L2$ 归一化 $\frac{v}{\|v\|_2}$。</li>
             </ol>
         </li>
@@ -215,8 +216,9 @@
     <p>为了在本地客户端实现“全内存无倒排穷举比对”，抛弃了低效的标量计算 <code>for</code> 循环，底层直接使用 <code>System.Numerics.Vectors&lt;float&gt;</code>
         进行汇编级硬件加速。</p>
     <ul>
-        <li><strong>自适应降级：</strong> JIT 编译器动态评估 CPU 能力，支持 AVX2 的 CPU 单周期可吞吐 8 个 Float 并行乘加（256-bit）；若硬件不支持，可无缝平滑降级至 SSE2
-            甚至标量运算，拒绝异常崩溃。</li>
+        <li><strong>自适应降级：</strong> JIT 编译器动态评估 CPU 能力，物理核心大于等于8个 的 CPU 单周期可吞吐 8 个 Float
+            并行乘加（256-bit）；若硬件不支持，可无缝平滑降级至更低的batch size以及
+            SSE2 甚至标量运算，拒绝异常崩溃。</li>
     </ul>
 
     <h3>3.2 元数据稀疏性惩罚 (Metadata Sparsity Penalty)</h3>
@@ -299,59 +301,84 @@
             classDef dbBox fill:#f0fdf4,stroke:#4ade80,stroke-width:2px,stroke-dasharray: 5 5,color:#0f172a;
 
             subgraph Data_Vectorization [一、多模态特征融合向量化]
-            V_In[非结构化数据输入\nDataID/Title/Genre/Actor]:::dataBox
+            V_In[元数据输入\nTitle/Plot/Genre/Actor/BodyStats]:::dataBox
 
             subgraph NLP_Track [NLP 文本语义轨道]
-            T_Prompt[拼接顺序重排与\n静态兜底剧情生成]:::processBox
-            ONNX[BGE-M3 ONNX Transformer 模型\n1024维稠密张量]:::aiBox
-            MeanPool[CLS/Mean Pooling\n提取核心语义]:::processBox
+            Clean[blacklist_plot/genre.txt\n全字匹配物理清洗]:::processBox
+            T_Prompt[兜底剧情生成 & 拼接顺序重排]:::processBox
+            ONNX[BGE-M3 ONNX 模型\n提取 1024维语义向量]:::aiBox
             end
 
             subgraph Num_Track [数值连续轨道]
-            N_Extract[提取原生及派生数值]:::processBox
-            Gauss[分位数锚点高斯激活\nL2 局部归一化]:::aiBox
+            N_Extract[提取演员 9项身材参数]:::processBox
+            Gauss[分位数锚点高斯激活\n生成 82维连续特征]:::aiBox
             end
 
-            V_In --> T_Prompt
-            V_In --> N_Extract
-            T_Prompt --> ONNX --> MeanPool
-            N_Extract --> Gauss
+            V_In --> Clean --> T_Prompt --> ONNX
+            V_In --> N_Extract --> Gauss
 
-            Merge[维度拼接与动态缩放\n1024d + 82d = 1106d]:::processBox
+            Merge[降维拼接\n1024d + 82d = 1106d]:::processBox
             L2_Global[全局 L2 归一化\nBuffer.BlockCopy 纯净打包]:::processBox
-            DB_Video[(metadata_video.Embedding)]:::dbBox
+            DB_Video[(全库 1106d 混合特征池\nmetadata_video.Embedding)]:::dbBox
 
-            MeanPool --> Merge
+            ONNX --> Merge
             Gauss --> Merge
             Merge --> L2_Global --> DB_Video
             end
 
-            subgraph Serving_Layer [二、毫秒级语义检索与召回]
-            Q_In[用户搜索输入 Query]:::dataBox
-            Q_Prompt[自然语言直接送入\n零前缀处理]:::processBox
-            Q_ONNX[BGE-M3 ONNX 实时推理\n生成 1106d 目标查询向量]:::aiBox
+            subgraph Profiling_Layer [二、用户画像生成]
+            History[用户观影历史\nGrade / ViewCount]:::dataBox
+            ExtractHist[提取对应影片的 1106d 混合向量]:::processBox
+            TFIDF[TF-IDF 差分计算\n分离显性偏好与厌恶]:::processBox
+            Profile[(UserProfile 画像\nMaster / Penalty 双向量)]:::dbBox
 
-            Q_In --> Q_Prompt --> Q_ONNX
-
-            RAM_Load[全量 1106d Embedding 预载入\n绕过磁盘 IO 瓶颈]:::processBox
-            SIMD[System.Numerics.Vectors\nAVX2 / SSE2 硬件加速向量点积]:::aiBox
-            Sparsity[元数据稀疏性惩罚\n拦截低长真空锚点漂移]:::processBox
-
-            DB_Video --> RAM_Load --> SIMD
-            Q_ONNX --> SIMD
-            SIMD --> Sparsity --> RankedList[Top 50 初排列表]:::dataBox
+            History --> ExtractHist --> TFIDF --> Profile
             end
 
-            subgraph Reranking_Layer [三、多样性过滤与重排]
-            Profile[(UserProfile 偏好画像\nMaster / Penalty 双向量)]:::dbBox
-            Score_Adjust[画像偏好融合计算\n质量分提权 & 负向量截断]:::processBox
+            subgraph Rec_Search_Similar [三、三大查询召回业务流]
+
+            subgraph Rec_Flow [A. 智能推荐流 (Recommendation)]
+            R_Sample[平方根衰减真随机抽样\n动态获取候选池]:::processBox
+            R_Sim[AVX2 加速点积\n计算与画像 Master 的相似度]:::aiBox
+            Profile -.-> R_Sim
+            R_Sample --> R_Sim
+            end
+
+            subgraph Search_Flow [B. 语义检索流 (Semantic Search)]
+            Q_In[用户自然语言 Query]:::dataBox
+            Q_ONNX[BGE-M3 实时生成\n1024d 查询向量]:::aiBox
+            S_Sim[AVX2 降维对齐点积\n1024d vs 1106d库 取前1024d]:::aiBox
+            Q_In --> Q_ONNX --> S_Sim
+            end
+
+            subgraph Similar_Flow [C. 同类影片查找流 (Similar Movies)]
+            Sim_In[源影片 ID]:::dataBox
+            Sim_Rebuild[剥离身材数据\n重构纯文本临时特征]:::processBox
+            Sim_ONNX[BGE-M3 实时生成\n1024d 纯净查询向量]:::aiBox
+            Sim_Sim[AVX2 降维对齐点积\n阻断数值特征串味]:::aiBox
+            Sim_In --> Sim_Rebuild --> Sim_ONNX --> Sim_Sim
+            end
+
+            RAM_Load[全量 1106d Embedding 预载入\n绕过磁盘 IO 瓶颈]:::processBox
+            DB_Video --> RAM_Load
+            RAM_Load -.-> R_Sample
+            RAM_Load -.-> S_Sim
+            RAM_Load -.-> Sim_Sim
+            end
+
+            subgraph Reranking_Layer [四、多样性过滤与重排]
+            Pre_List[召回初排候选列表]:::dataBox
+            Sparsity[元数据稀疏性惩罚\n拦截低长真空锚点漂移]:::processBox
+            Score_Adjust[画像偏好及 AWS 加权\n融合 Quality / PenaltyScore]:::processBox
             Quota[10% 演员防屠版拦截配额]:::processBox
             MMR[MMR 惩罚算法 λ=0.7\n降权同质化结果]:::aiBox
-            Output[最终展示推荐/搜索结果]:::dataBox
+            Output[最终 UI 渲染展示]:::dataBox
 
-            RankedList --> Score_Adjust
-            Profile --> Score_Adjust
-            Score_Adjust --> Quota --> MMR --> Output
+            R_Sim --> Pre_List
+            S_Sim --> Pre_List
+            Sim_Sim --> Pre_List
+
+            Pre_List --> Sparsity --> Score_Adjust --> Quota --> MMR --> Output
             end
         </div>
     </div>
