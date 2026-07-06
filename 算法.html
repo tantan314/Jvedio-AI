@@ -300,79 +300,79 @@
             classDef aiBox fill:#fdf4ff,stroke:#d946ef,stroke-width:2px,color:#0f172a;
             classDef dbBox fill:#f0fdf4,stroke:#4ade80,stroke-width:2px,stroke-dasharray: 5 5,color:#0f172a;
 
-            subgraph Data_Vectorization [一、多模态特征融合向量化]
-            V_In[元数据输入\nTitle/Plot/Genre/Actor/BodyStats]:::dataBox
+            subgraph Data_Vectorization ["一、多模态特征融合向量化"]
+            V_In["元数据输入<br>Title/Plot/Genre/Actor/BodyStats"]:::dataBox
 
-            subgraph NLP_Track [NLP 文本语义轨道]
-            Clean[blacklist_plot/genre.txt\n全字匹配物理清洗]:::processBox
-            T_Prompt[兜底剧情生成 & 拼接顺序重排]:::processBox
-            ONNX[BGE-M3 ONNX 模型\n提取 1024维语义向量]:::aiBox
+            subgraph NLP_Track ["NLP 文本语义轨道"]
+            Clean["blacklist_plot/genre.txt<br>全字匹配物理清洗"]:::processBox
+            T_Prompt["兜底剧情生成 & 拼接顺序重排"]:::processBox
+            ONNX["BGE-M3 ONNX 模型<br>提取 1024维语义向量"]:::aiBox
             end
 
-            subgraph Num_Track [数值连续轨道]
-            N_Extract[提取演员 9项身材参数]:::processBox
-            Gauss[分位数锚点高斯激活\n生成 82维连续特征]:::aiBox
+            subgraph Num_Track ["数值连续轨道"]
+            N_Extract["提取演员 9项身材参数"]:::processBox
+            Gauss["分位数锚点高斯激活<br>生成 82维连续特征"]:::aiBox
             end
 
             V_In --> Clean --> T_Prompt --> ONNX
             V_In --> N_Extract --> Gauss
 
-            Merge[降维拼接\n1024d + 82d = 1106d]:::processBox
-            L2_Global[全局 L2 归一化\nBuffer.BlockCopy 纯净打包]:::processBox
-            DB_Video[(全库 1106d 混合特征池\nmetadata_video.Embedding)]:::dbBox
+            Merge["降维拼接<br>1024d + 82d = 1106d"]:::processBox
+            L2_Global["全局 L2 归一化<br>Buffer.BlockCopy 纯净打包"]:::processBox
+            DB_Video[("全库 1106d 混合特征池<br>metadata_video.Embedding")]:::dbBox
 
             ONNX --> Merge
             Gauss --> Merge
             Merge --> L2_Global --> DB_Video
             end
 
-            subgraph Profiling_Layer [二、用户画像生成]
-            History[用户观影历史\nGrade / ViewCount]:::dataBox
-            ExtractHist[提取对应影片的 1106d 混合向量]:::processBox
-            TFIDF[TF-IDF 差分计算\n分离显性偏好与厌恶]:::processBox
-            Profile[(UserProfile 画像\nMaster / Penalty 双向量)]:::dbBox
+            subgraph Profiling_Layer ["二、用户画像生成"]
+            History["用户观影历史<br>Grade / ViewCount"]:::dataBox
+            ExtractHist["提取对应影片的 1106d 混合向量"]:::processBox
+            TFIDF["TF-IDF 差分计算<br>分离显性偏好与厌恶"]:::processBox
+            Profile[("UserProfile 画像<br>Master / Penalty 双向量")]:::dbBox
 
             History --> ExtractHist --> TFIDF --> Profile
             end
 
-            subgraph Rec_Search_Similar [三、三大查询召回业务流]
+            subgraph Rec_Search_Similar ["三、三大查询召回业务流"]
 
-            subgraph Rec_Flow [A. 智能推荐流 (Recommendation)]
-            R_Sample[平方根衰减真随机抽样\n动态获取候选池]:::processBox
-            R_Sim[AVX2 加速点积\n计算与画像 Master 的相似度]:::aiBox
+            subgraph Rec_Flow ["A. 智能推荐流 (Recommendation)"]
+            R_Sample["平方根衰减真随机抽样<br>动态获取候选池"]:::processBox
+            R_Sim["AVX2 加速点积<br>计算与画像 Master 的相似度"]:::aiBox
             Profile -.-> R_Sim
             R_Sample --> R_Sim
             end
 
-            subgraph Search_Flow [B. 语义检索流 (Semantic Search)]
-            Q_In[用户自然语言 Query]:::dataBox
-            Q_ONNX[BGE-M3 实时生成\n1024d 查询向量]:::aiBox
-            S_Sim[AVX2 降维对齐点积\n1024d vs 1106d库 取前1024d]:::aiBox
+            subgraph Search_Flow ["B. 语义检索流 (Semantic Search)"]
+            Q_In["用户自然语言 Query"]:::dataBox
+            Q_ONNX["BGE-M3 实时生成<br>1024d 查询向量"]:::aiBox
+            S_Sim["AVX2 降维对齐点积<br>1024d vs 1106d库 取前1024d"]:::aiBox
             Q_In --> Q_ONNX --> S_Sim
             end
 
-            subgraph Similar_Flow [C. 同类影片查找流 (Similar Movies)]
-            Sim_In[源影片 ID]:::dataBox
-            Sim_Rebuild[剥离身材数据\n重构纯文本临时特征]:::processBox
-            Sim_ONNX[BGE-M3 实时生成\n1024d 纯净查询向量]:::aiBox
-            Sim_Sim[AVX2 降维对齐点积\n阻断数值特征串味]:::aiBox
+            subgraph Similar_Flow ["C. 同类影片查找流 (Similar Movies)"]
+            Sim_In["源影片 ID"]:::dataBox
+            Sim_Rebuild["剥离身材数据<br>重构纯文本临时特征"]:::processBox
+            Sim_ONNX["BGE-M3 实时生成<br>1024d 纯净查询向量"]:::aiBox
+            Sim_Sim["AVX2 降维对齐点积<br>阻断数值特征串味"]:::aiBox
             Sim_In --> Sim_Rebuild --> Sim_ONNX --> Sim_Sim
             end
 
-            RAM_Load[全量 1106d Embedding 预载入\n绕过磁盘 IO 瓶颈]:::processBox
+            RAM_Load["全量 1106d Embedding 预载入<br>绕过磁盘 IO 瓶颈"]:::processBox
             DB_Video --> RAM_Load
             RAM_Load -.-> R_Sample
             RAM_Load -.-> S_Sim
             RAM_Load -.-> Sim_Sim
             end
 
-            subgraph Reranking_Layer [四、多样性过滤与重排]
-            Pre_List[召回初排候选列表]:::dataBox
-            Sparsity[元数据稀疏性惩罚\n拦截低长真空锚点漂移]:::processBox
-            Score_Adjust[画像偏好及 AWS 加权\n融合 Quality / PenaltyScore]:::processBox
-            Quota[10% 演员防屠版拦截配额]:::processBox
-            MMR[MMR 惩罚算法 λ=0.7\n降权同质化结果]:::aiBox
-            Output[最终 UI 渲染展示]:::dataBox
+            subgraph Reranking_Layer ["四、多样性过滤与重排"]
+            Pre_List["召回初排候选列表"]:::dataBox
+            Sparsity["元数据稀疏性惩罚<br>拦截低长真空锚点漂移"]:::processBox
+            Score_Adjust["画像偏好及 AWS 加权<br>融合 Quality / PenaltyScore"]:::processBox
+            Quota["10% 演员防屠版拦截配额"]:::processBox
+            MMR["MMR 惩罚算法 λ=0.7<br>降权同质化结果"]:::aiBox
+            Output["最终 UI 渲染展示"]:::dataBox
 
             R_Sim --> Pre_List
             S_Sim --> Pre_List
