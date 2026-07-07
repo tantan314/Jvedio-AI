@@ -1,5 +1,5 @@
 # Jvedio-AI
-一个本地化的（JAV）电影管理/数据库系统
+一个本地化的电影（J）管理/数据库系统
 
 <img width="2591" height="1680" alt="image" src="https://github.com/user-attachments/assets/a43c4d65-b61f-4b6c-b52b-75e550992dc2" />
 
